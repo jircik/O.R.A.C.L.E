@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "oracle",
+  "description": "A Socratic study mentor for Claude Code, with memory of what you already know.",
+  "owner": {
+    "name": "jircik",
+    "url": "https://github.com/jircik"
+  },
+  "plugins": [
+    {
+      "name": "oracle",
+      "description": "Turns Claude into a study mentor on demand: it teaches instead of answering, and remembers your plans and what you have mastered.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

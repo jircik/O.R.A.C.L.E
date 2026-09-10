@@ -1,0 +1,33 @@
+{
+  "name": "oracle",
+  "description": "O.R.A.C.L.E — Organized Reasoning & Academic Coaching Learning Engine. Turns Claude into a Socratic study mentor, on demand, with a student model that persists between sessions.",
+  "version": "0.1.0",
+  "author": {
+    "name": "jircik",
+    "url": "https://github.com/jircik"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/tutor_guard.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session_save.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -505,6 +505,20 @@ def _cmd_commit(args) -> int:
     return 0
 
 
+def _resolve_session_id(args) -> None:
+    """Claude Code exports CLAUDE_CODE_SESSION_ID, and it is the same id the
+    hooks receive. Commands rely on that so a prompt never has to guess."""
+    if getattr(args, "session_id", None):
+        return
+    from_env = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if not from_env:
+        raise ValueError(
+            "não consegui descobrir a sessão: passe --session-id ou defina "
+            "CLAUDE_CODE_SESSION_ID."
+        )
+    args.session_id = from_env
+
+
 NEEDS_STATE = {
     "concepts-list", "concepts-set", "profile-set",
     "plan-save", "plan-show", "plan-list",
@@ -566,17 +580,17 @@ def _build_parser():
     p.set_defaults(func=_cmd_plan_list)
 
     p = sub.add_parser("session-activate")
-    p.add_argument("--session-id", required=True)
+    p.add_argument("--session-id", default=None)
     p.add_argument("--topic", default="")
     p.add_argument("--plan-slug", default=None)
     p.set_defaults(func=_cmd_session_activate)
 
     p = sub.add_parser("session-show")
-    p.add_argument("--session-id", required=True)
+    p.add_argument("--session-id", default=None)
     p.set_defaults(func=_cmd_session_show)
 
     p = sub.add_parser("session-deactivate")
-    p.add_argument("--session-id", required=True)
+    p.add_argument("--session-id", default=None)
     p.set_defaults(func=_cmd_session_deactivate)
 
     p = sub.add_parser("log")
@@ -599,6 +613,12 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.command.startswith("session-"):
+        try:
+            _resolve_session_id(args)
+        except ValueError as exc:
+            print(f"[oracle] {exc}", file=sys.stderr)
+            return 1
     try:
         return args.func(args)
     except (ValueError, OracleNotInitialized) as exc:

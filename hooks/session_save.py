@@ -10,6 +10,7 @@ so turning the mode off by hand and then closing the terminal logs once.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -50,6 +51,19 @@ def save_and_close(session_id: str) -> dict:
 
 
 def main() -> int:
+    argv = sys.argv[1:]
+
+    if "--off" in argv:
+        session_id = None
+        if "--session-id" in argv:
+            session_id = argv[argv.index("--session-id") + 1]
+        session_id = session_id or os.environ.get("CLAUDE_CODE_SESSION_ID")
+        if not session_id or not store.is_initialized():
+            print(json.dumps({"saved": False, "log": None, "commit": None}))
+            return 0
+        print(json.dumps(save_and_close(session_id), ensure_ascii=False, indent=2))
+        return 0
+
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except (json.JSONDecodeError, OSError):
