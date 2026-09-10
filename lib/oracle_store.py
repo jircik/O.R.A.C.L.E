@@ -211,3 +211,107 @@ def commit(message: str) -> dict:
             f"salvo e sobe no próximo sync. Detalhe: {pushed.stderr.strip()[:200]}"
         )
     return result
+
+
+import re
+import unicodedata
+
+
+def slugify(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text or "")
+    ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_only).strip("-").lower()
+    return slug or "sem-titulo"
+
+
+# --- concepts -------------------------------------------------------------
+
+def list_concepts() -> list:
+    return read_json("concepts.json", [])
+
+
+def concept_level(concept: str):
+    target = (concept or "").strip().lower()
+    for record in list_concepts():
+        if record.get("concept", "").strip().lower() == target:
+            return record.get("level")
+    return None
+
+
+def upsert_concept(concept: str, domain: str, level: str, evidence: str) -> dict:
+    """Record what the student knows.
+
+    A concept only reaches "known" when the student demonstrated it — that
+    judgement belongs to the tutor skill, which passes the evidence here.
+    """
+    if level not in CONCEPT_LEVELS:
+        raise ValueError(f"unknown level: {level!r} (expected one of {CONCEPT_LEVELS})")
+
+    concepts = list_concepts()
+    target = (concept or "").strip().lower()
+    record = {
+        "concept": concept,
+        "domain": domain,
+        "level": level,
+        "evidence": evidence,
+        "updated_at": _today(),
+    }
+
+    for index, existing in enumerate(concepts):
+        if existing.get("concept", "").strip().lower() == target:
+            concepts[index] = record
+            break
+    else:
+        concepts.append(record)
+
+    write_json("concepts.json", concepts)
+    return record
+
+
+def known_concepts() -> list:
+    return [c["concept"] for c in list_concepts() if c.get("level") == "known"]
+
+
+# --- plans ----------------------------------------------------------------
+
+def save_plan(plan: dict) -> str:
+    topic = (plan or {}).get("topic")
+    if not topic:
+        raise ValueError("plan requires a 'topic'")
+
+    slug = plan.get("id") or slugify(topic)
+    previous = load_plan(slug) or {}
+
+    record = {
+        "id": slug,
+        "topic": topic,
+        "goal": plan.get("goal", ""),
+        "deadline": plan.get("deadline"),
+        "status": plan.get("status", "active"),
+        "milestones": plan.get("milestones", []),
+        "sessions": plan.get("sessions", previous.get("sessions", [])),
+        "created_at": previous.get("created_at", _today()),
+    }
+    write_json(f"plans/{slug}.json", record)
+    return slug
+
+
+def load_plan(slug: str):
+    return read_json(f"plans/{slug}.json", None)
+
+
+def list_plans(status: str = None) -> list:
+    plans_dir = home() / "plans"
+    if not plans_dir.is_dir():
+        return []
+    plans = []
+    for path in sorted(plans_dir.glob("*.json")):
+        plan = read_json(f"plans/{path.name}", None)
+        if plan and (status is None or plan.get("status") == status):
+            plans.append(plan)
+    return plans
+
+
+def active_plan():
+    plans = list_plans(status="active")
+    return plans[0] if plans else None
