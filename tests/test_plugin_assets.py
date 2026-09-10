@@ -5,8 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-EXPECTED_COMMANDS = {"oracle", "oracle-off"}
-EXPECTED_SKILLS = {"oracle-tutor"}
+EXPECTED_COMMANDS = {"oracle", "oracle-off", "oracle-setup"}
+EXPECTED_SKILLS = {"oracle-tutor", "oracle-setup"}
 CLI_SUBCOMMANDS = {
     "status", "init", "concepts-list", "concepts-set", "plan-save", "plan-show",
     "plan-list", "session-activate", "session-show", "session-deactivate",
