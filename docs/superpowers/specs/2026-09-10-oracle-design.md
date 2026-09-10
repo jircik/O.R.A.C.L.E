@@ -194,6 +194,18 @@ demonstra — reformula certo, acerta a previsão. Nunca porque o Claude explico
 bem. É a única coisa que impede `concepts.json` de virar um arquivo otimista
 que corta do plano exatamente o que o aluno não sabe.
 
+A escrita acontece no momento da demonstração, ainda durante a sessão, via
+`oracle-store` — não só no fim. `session-save` é rede de segurança para o que
+não foi gravado, não o único ponto de escrita: uma sessão interrompida sem
+`SessionEnd` não pode apagar o progresso demonstrado.
+
+### `/oracle-off`
+
+Executa a mesma rotina de gravação que `session-save` e remove
+`.active/<session_id>.json`. A rotina é idempotente e não faz nada quando não
+há sessão ativa, então desligar à mão e depois fechar o terminal não grava o
+log duas vezes.
+
 ### `/oracle-plan [tópico]`
 
 1. Lê `concepts.json`
