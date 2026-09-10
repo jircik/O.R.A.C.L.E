@@ -66,11 +66,10 @@ oracle/
 │   ├── oracle-plan/SKILL.md
 │   └── oracle-status/SKILL.md
 ├── hooks/
-│   ├── hooks.json
-│   ├── tutor-guard          # UserPromptSubmit
-│   └── session-save         # SessionEnd
+│   ├── tutor_guard.py       # UserPromptSubmit
+│   └── session_save.py      # SessionEnd
 ├── lib/
-│   └── oracle-store         # única camada que toca o disco
+│   └── oracle_store.py      # única camada que toca o disco, e a CLI das skills
 ├── tests/
 ├── README.md
 ├── BACKLOG.md
@@ -135,7 +134,12 @@ descobrir o que o aluno já sabe.
 ### Camada de storage
 
 **Nenhuma skill escreve em disco diretamente.** Tudo passa por
-`lib/oracle-store`, que expõe `read`, `write`, `commit` e `init`.
+`lib/oracle_store.py`, que expõe `read`, `write`, `commit` e `init` — e os
+publica como uma CLI que imprime JSON, porque skills são prompts e alcançam o
+disco por `Bash`.
+
+Os hooks são declarados no `.claude-plugin/plugin.json`, que é onde o Claude
+Code registra hooks de plugin.
 
 É isso que permite três trilhos de storage sem triplicar código — a skill não
 sabe em qual trilho está:
@@ -227,7 +231,9 @@ modo desligado, que é o requisito do opt-in.
 arquivo de `.active/`.
 
 O estado ativo é indexado por `session_id`, que o hook recebe no payload de
-stdin: estudar num terminal e trabalhar em outro não se contaminam.
+stdin e que os comandos leem de `CLAUDE_CODE_SESSION_ID` — a mesma id, exportada
+para o ambiente do `Bash`. Estudar num terminal e trabalhar em outro não se
+contaminam.
 
 O contrato do tutor vive na SKILL.md, não no hook. A skill funciona sozinha
 onde não há hooks (claude.ai, outros harnesses); o hook apenas mantém o
