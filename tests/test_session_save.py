@@ -49,8 +49,20 @@ class TestHookBehaviour(SaveTestCase):
         self.assertIn("Teoria dos Grafos", logs[0].read_text(encoding="utf-8"))
         self.assertIsNone(store.active_record("s1"))
 
-    def test_garbage_stdin_exits_zero(self):
+    def test_empty_stdin_exits_zero(self):
         self.assertEqual(run_hook(None).returncode, 0)
+
+    def test_invalid_json_stdin_exits_zero(self):
+        """Invalid JSON on stdin is silently ignored and hook exits 0."""
+        result = subprocess.run(
+            [sys.executable, HOOK],
+            capture_output=True,
+            text=True,
+            input="not json at all",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
 
     def test_prunes_orphan_markers(self):
         from datetime import datetime, timedelta, timezone
@@ -98,6 +110,62 @@ class TestSaveAndClose(SaveTestCase):
         session_save.save_and_close("s2")
         plan = store.load_plan("teoria-dos-grafos")
         self.assertEqual(len(plan["sessions"]), 1)  # same day, same log file
+
+    def test_handles_nonexistent_plan(self):
+        """Marker with plan_slug pointing to a plan that doesn't exist."""
+        import session_save
+
+        store.activate("s1", "Tema", "tema-inexistente")
+        result = session_save.save_and_close("s1")
+        # Still succeeds and writes the log
+        self.assertTrue(result["saved"])
+        self.assertIsNotNone(result["log"])
+        logs = list((store.home() / "sessions").glob("*.md"))
+        self.assertEqual(len(logs), 1)
+        # Marker is closed
+        self.assertIsNone(store.active_record("s1"))
+
+    def test_idempotent_even_if_plan_link_fails(self):
+        """If plan-link fails, marker is already gone (test Finding 1).
+
+        Patch load_plan to return None so the if plan guard prevents
+        the append, or patch save_plan to raise. Either way, verify that
+        a second save_and_close() sees the marker as gone.
+        """
+        import session_save
+
+        store.save_plan({"topic": "Algebra", "status": "active"})
+        store.activate("s1", "Algebra", "algebra")
+
+        # First, let's verify a normal call works
+        first = session_save.save_and_close("s1")
+        self.assertTrue(first["saved"])
+
+        # Now activate again and patch save_plan to fail
+        store.activate("s2", "Algebra", "algebra")
+        original_save_plan = store.save_plan
+
+        def failing_save_plan(plan):
+            raise RuntimeError("simulated plan-link failure")
+
+        store.save_plan = failing_save_plan
+
+        try:
+            # This will raise because save_plan fails, but the marker
+            # should already be gone by then (deactivate happened first)
+            try:
+                session_save.save_and_close("s2")
+            except RuntimeError:
+                pass  # Expected: plan-link failed
+        finally:
+            store.save_plan = original_save_plan
+
+        # Now verify that the marker for s2 is actually gone
+        self.assertIsNone(store.active_record("s2"))
+
+        # And a second call to save_and_close would return saved=False
+        second = session_save.save_and_close("s2")
+        self.assertFalse(second["saved"])
 
 
 if __name__ == "__main__":

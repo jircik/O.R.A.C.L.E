@@ -31,16 +31,20 @@ def save_and_close(session_id: str) -> dict:
     )
     log_rel = store.log_session(topic, entry)
 
+    # Close the marker immediately after logging, before plan-link operations.
+    # If plan-link fails, we lose a cross-reference (cosmetic) rather than
+    # duplicate the session log (not recoverable without hand-editing).
+    store.deactivate(session_id)
+
     plan_slug = record.get("plan_slug")
     if plan_slug:
         plan = store.load_plan(plan_slug)
         if plan:
-            session_id_str = Path(log_rel).stem
-            if session_id_str not in plan.get("sessions", []):
-                plan.setdefault("sessions", []).append(session_id_str)
+            log_stem = Path(log_rel).stem
+            if log_stem not in plan.get("sessions", []):
+                plan.setdefault("sessions", []).append(log_stem)
                 store.save_plan(plan)
 
-    store.deactivate(session_id)
     result = store.commit(f"oracle: sessão de estudo sobre {topic}")
     return {"saved": True, "log": log_rel, "commit": result}
 
