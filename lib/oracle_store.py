@@ -512,11 +512,26 @@ NEEDS_STATE = {
 }
 
 
-def _build_parser():
-    import argparse
+import argparse as _argparse
 
-    parser = argparse.ArgumentParser(prog="oracle_store")
-    sub = parser.add_subparsers(dest="command", required=True)
+
+class _OracleArgumentParser(_argparse.ArgumentParser):
+    """ArgumentParser subclass that exits with code 1 (not 2) on validation errors.
+
+    The contract is: 0 success, 2 state not initialized, 1 other error.
+    argparse.ArgumentParser.error() defaults to exit 2, which collides with our
+    "state not initialized" code. This subclass redirects argument errors to exit 1.
+    """
+
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        print(f"[oracle] {message}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _build_parser():
+    parser = _OracleArgumentParser(prog="oracle_store")
+    sub = parser.add_subparsers(dest="command", required=True, parser_class=_OracleArgumentParser)
 
     sub.add_parser("status").set_defaults(func=_cmd_status)
 

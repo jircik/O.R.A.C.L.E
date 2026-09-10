@@ -61,7 +61,7 @@ class TestInit(CliTestCase):
 
     def test_init_rejects_bad_mode(self):
         result = run("init", "--mode", "dropbox")
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
 
 
 class TestConcepts(CliTestCase):
@@ -94,7 +94,7 @@ class TestConcepts(CliTestCase):
             "concepts-set", "--concept", "a", "--domain", "d",
             "--level", "mastered", "--evidence", "e",
         )
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
 
 
 class TestProfile(CliTestCase):
@@ -165,6 +165,10 @@ class TestSession(CliTestCase):
         payload = self.json_of(run("log", "--topic", "Grafos", stdin="cobriu BFS\n"))
         self.assertTrue(payload["path"].startswith("sessions/"))
         self.assertIn("cobriu BFS", (Path(os.environ["ORACLE_HOME"]) / payload["path"]).read_text())
+
+    def test_missing_required_flag_exits_1(self):
+        result = run("session-activate", "--topic", "Grafos")
+        self.assertEqual(result.returncode, 1)
 
 
 class TestCommit(CliTestCase):
