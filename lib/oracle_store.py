@@ -399,3 +399,197 @@ def prune_active(max_age_hours: int = 24) -> int:
             path.unlink()
             removed += 1
     return removed
+
+
+# --- CLI ------------------------------------------------------------------
+#
+# Skills are prompts: they reach this module by shelling out. Every subcommand
+# prints a single JSON object so a prompt can read the result without parsing
+# prose. Exit codes: 0 ok, 2 state missing, 1 error.
+
+def _emit(payload) -> None:
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _cmd_status(args) -> int:
+    if not is_initialized():
+        _emit({"initialized": False, "home": str(home())})
+        return 0
+    plan = active_plan()
+    _emit(
+        {
+            "initialized": True,
+            "home": str(home()),
+            "storage_mode": config().get("storage_mode"),
+            "concepts": len(list_concepts()),
+            "known": known_concepts(),
+            "profile": read_json("profile.json", {}),
+            "active_plan": plan,
+            "plans": len(list_plans()),
+        }
+    )
+    return 0
+
+
+def _cmd_init(args) -> int:
+    _emit(init(args.mode))
+    return 0
+
+
+def _cmd_concepts_list(args) -> int:
+    concepts = list_concepts()
+    if args.level:
+        concepts = [c for c in concepts if c.get("level") == args.level]
+    _emit({"concepts": concepts})
+    return 0
+
+
+def _cmd_concepts_set(args) -> int:
+    _emit(upsert_concept(args.concept, args.domain, args.level, args.evidence))
+    return 0
+
+
+def _cmd_profile_set(args) -> int:
+    """The profile is how the tutor remembers which analogies land."""
+    profile = read_json("profile.json", dict(DEFAULT_PROFILE))
+    profile[args.key] = args.value
+    write_json("profile.json", profile)
+    _emit(profile)
+    return 0
+
+
+def _cmd_plan_save(args) -> int:
+    raw = sys.stdin.read()
+    try:
+        plan = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"plano inválido no stdin: {exc}")
+    slug = save_plan(plan)
+    _emit({"slug": slug, "plan": load_plan(slug)})
+    return 0
+
+
+def _cmd_plan_show(args) -> int:
+    plan = load_plan(args.slug) if args.slug else active_plan()
+    _emit({"plan": plan})
+    return 0
+
+
+def _cmd_plan_list(args) -> int:
+    _emit({"plans": list_plans(status=args.status)})
+    return 0
+
+
+def _cmd_session_activate(args) -> int:
+    _emit(activate(args.session_id, args.topic, args.plan_slug))
+    return 0
+
+
+def _cmd_session_show(args) -> int:
+    _emit({"active": active_record(args.session_id)})
+    return 0
+
+
+def _cmd_session_deactivate(args) -> int:
+    _emit({"was_active": deactivate(args.session_id)})
+    return 0
+
+
+def _cmd_log(args) -> int:
+    _emit({"path": log_session(args.topic, sys.stdin.read())})
+    return 0
+
+
+def _cmd_commit(args) -> int:
+    _emit(commit(args.message))
+    return 0
+
+
+NEEDS_STATE = {
+    "concepts-list", "concepts-set", "profile-set",
+    "plan-save", "plan-show", "plan-list",
+    "session-activate", "session-show", "session-deactivate", "log", "commit",
+}
+
+
+def _build_parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="oracle_store")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("status").set_defaults(func=_cmd_status)
+
+    p = sub.add_parser("init")
+    p.add_argument("--mode", required=True, choices=list(STORAGE_MODES))
+    p.set_defaults(func=_cmd_init)
+
+    p = sub.add_parser("concepts-list")
+    p.add_argument("--level", choices=list(CONCEPT_LEVELS))
+    p.set_defaults(func=_cmd_concepts_list)
+
+    p = sub.add_parser("concepts-set")
+    p.add_argument("--concept", required=True)
+    p.add_argument("--domain", default="")
+    p.add_argument("--level", required=True, choices=list(CONCEPT_LEVELS))
+    p.add_argument("--evidence", default="")
+    p.set_defaults(func=_cmd_concepts_set)
+
+    p = sub.add_parser("profile-set")
+    p.add_argument("--key", required=True)
+    p.add_argument("--value", required=True)
+    p.set_defaults(func=_cmd_profile_set)
+
+    sub.add_parser("plan-save").set_defaults(func=_cmd_plan_save)
+
+    p = sub.add_parser("plan-show")
+    p.add_argument("--slug")
+    p.set_defaults(func=_cmd_plan_show)
+
+    p = sub.add_parser("plan-list")
+    p.add_argument("--status")
+    p.set_defaults(func=_cmd_plan_list)
+
+    p = sub.add_parser("session-activate")
+    p.add_argument("--session-id", required=True)
+    p.add_argument("--topic", default="")
+    p.add_argument("--plan-slug", default=None)
+    p.set_defaults(func=_cmd_session_activate)
+
+    p = sub.add_parser("session-show")
+    p.add_argument("--session-id", required=True)
+    p.set_defaults(func=_cmd_session_show)
+
+    p = sub.add_parser("session-deactivate")
+    p.add_argument("--session-id", required=True)
+    p.set_defaults(func=_cmd_session_deactivate)
+
+    p = sub.add_parser("log")
+    p.add_argument("--topic", required=True)
+    p.set_defaults(func=_cmd_log)
+
+    p = sub.add_parser("commit")
+    p.add_argument("--message", required=True)
+    p.set_defaults(func=_cmd_commit)
+
+    return parser
+
+
+def main(argv=None) -> int:
+    args = _build_parser().parse_args(argv)
+    if args.command in NEEDS_STATE and not is_initialized():
+        print(
+            "[oracle] Estado não encontrado em "
+            f"{home()}. Rode /oracle-setup primeiro.",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        return args.func(args)
+    except (ValueError, OracleNotInitialized) as exc:
+        print(f"[oracle] {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
