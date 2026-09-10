@@ -43,15 +43,15 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/oracle_store.py" init --mode <plain|git|git-r
 ```
 
 No trilho 3, depois do `init`, peça a URL do repositório privado dele e
-configure o remoto:
+configure o remoto. Use o caminho que saiu do `status` (o campo `home`):
 
 ```bash
-git -C "$HOME/.oracle" remote add origin <url>
-git -C "$HOME/.oracle" push -u origin HEAD
+git -C "<home do status>" remote add origin <url>
+git -C "<home do status>" push -u origin HEAD
 ```
 
 Se ele não tiver um repositório ainda e tiver o `gh` instalado e autenticado,
-ofereça criar: `gh repo create <nome> --private --source "$HOME/.oracle" --push`.
+ofereça criar: `gh repo create <nome> --private --source "<home do status>" --push`.
 Avise que o repositório precisa ser **privado** — é o histórico de estudo dele.
 
 ## 4. Feche

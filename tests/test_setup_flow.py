@@ -21,7 +21,10 @@ class TestSetupSkillContent(unittest.TestCase):
     """The setup skill is the only page a non-developer will ever read."""
 
     def setUp(self):
-        self.text = SKILL.read_text(encoding="utf-8")
+        raw_text = SKILL.read_text(encoding="utf-8")
+        # Normalize whitespace to make assertions robust to line wrapping
+        import re
+        self.text = re.sub(r'\s+', ' ', raw_text)
 
     def test_explains_all_three_tracks(self):
         for mode in ("plain", "git", "git-remote"):
@@ -31,7 +34,10 @@ class TestSetupSkillContent(unittest.TestCase):
         self.assertIn("não sabe o que é git", self.text.lower())
 
     def test_tells_the_model_not_to_overwrite_existing_state(self):
-        self.assertIn("status", self.text)
+        self.assertIn("não recrie nada", self.text.lower())
+
+    def test_does_not_hardcode_storage_path(self):
+        self.assertNotIn("$HOME/.oracle", self.text)
 
 
 class TestSetupIsSafeToRerun(unittest.TestCase):
