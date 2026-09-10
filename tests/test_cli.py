@@ -167,8 +167,17 @@ class TestSession(CliTestCase):
         self.assertIn("cobriu BFS", (Path(os.environ["ORACLE_HOME"]) / payload["path"]).read_text())
 
     def test_missing_required_flag_exits_1(self):
-        result = run("session-activate", "--topic", "Grafos")
+        env = dict(os.environ)
+        env.pop("CLAUDE_CODE_SESSION_ID", None)
+        result = subprocess.run(
+            [sys.executable, CLI, "session-activate", "--topic", "Grafos"],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
         self.assertEqual(result.returncode, 1)
+        self.assertIn("session", result.stderr.lower())
 
 
 class TestCommit(CliTestCase):
