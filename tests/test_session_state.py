@@ -53,6 +53,30 @@ class TestActivation(SessionTestCase):
         (store.home() / ".active" / "sess-1.json").write_text("nope", encoding="utf-8")
         self.assertIsNone(store.active_record("sess-1"))
 
+    def test_activate_writes_atomically(self):
+        store.activate("sess-1", "Grafos")
+        # No temporary files should be left in .active/
+        files = list((store.home() / ".active").glob(".tmp-*"))
+        self.assertEqual(len(files), 0)
+
+    def test_active_record_handles_invalid_utf8(self):
+        store.activate("sess-1", "Grafos")
+        # Overwrite with invalid UTF-8 bytes
+        path = store.home() / ".active" / "sess-1.json"
+        path.write_bytes(b"\xff\xfe not utf-8")
+        # Should return None, not raise
+        self.assertIsNone(store.active_record("sess-1"))
+
+    def test_different_degenerate_ids_dont_collide(self):
+        store.activate("..", "A")
+        store.activate("///", "B")
+        # Each should have its own marker with digest suffix
+        self.assertEqual(store.active_record("..")["topic"], "A")
+        self.assertEqual(store.active_record("///")["topic"], "B")
+        # Should have exactly 2 marker files
+        files = list((store.home() / ".active").glob("*.json"))
+        self.assertEqual(len(files), 2)
+
     def test_session_id_with_path_separators_is_sanitized(self):
         store.activate("../../escape", "Grafos")
         files = list((store.home() / ".active").glob("*.json"))

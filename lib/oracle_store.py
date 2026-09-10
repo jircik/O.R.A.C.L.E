@@ -4,6 +4,7 @@ Every read and write of the student state goes through this module. Skills,
 commands and hooks call it; nothing else touches ~/.oracle/ directly.
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -319,10 +320,19 @@ def active_plan():
 # --- session state -------------------------------------------------------
 
 
-def _active_path(session_id: str) -> Path:
+def _active_path(session_id: str) -> str:
     # A session id reaches us from a hook payload; never let it walk the tree.
-    safe = re.sub(r"[^A-Za-z0-9_-]+", "-", session_id or "unknown").strip("-") or "unknown"
-    return home() / ".active" / f"{safe}.json"
+    raw = session_id or "unknown"
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "-", raw).strip("-") or "unknown"
+
+    # Prevent collisions: if sanitization changed the ID, append a digest suffix.
+    if safe != raw:
+        digest = hashlib.sha256(raw.encode()).hexdigest()[:8]
+        filename = f"{safe}-{digest}.json"
+    else:
+        filename = f"{safe}.json"
+
+    return f".active/{filename}"
 
 
 def activate(session_id: str, topic: str = "", plan_slug: str = None) -> dict:
@@ -332,26 +342,27 @@ def activate(session_id: str, topic: str = "", plan_slug: str = None) -> dict:
         "plan_slug": plan_slug,
         "started_at": _now(),
     }
-    path = _active_path(session_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    rel = _active_path(session_id)
+    _write_atomic(rel, json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
 
 def active_record(session_id: str):
-    path = _active_path(session_id)
+    rel = _active_path(session_id)
+    path = _path(rel)
     if not path.exists():
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (ValueError, OSError):
         # A broken marker means "not studying", never a crash mid-session.
         return None
 
 
 def deactivate(session_id: str):
     record = active_record(session_id)
-    path = _active_path(session_id)
+    rel = _active_path(session_id)
+    path = _path(rel)
     if path.exists():
         path.unlink()
     return record
@@ -382,7 +393,7 @@ def prune_active(max_age_hours: int = 24) -> int:
             if started.tzinfo is None:
                 started = started.replace(tzinfo=timezone.utc)
             stale = started < cutoff
-        except (json.JSONDecodeError, OSError, KeyError, ValueError):
+        except (ValueError, OSError, KeyError):
             stale = True
         if stale:
             path.unlink()
