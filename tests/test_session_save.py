@@ -125,47 +125,80 @@ class TestSaveAndClose(SaveTestCase):
         # Marker is closed
         self.assertIsNone(store.active_record("s1"))
 
-    def test_idempotent_even_if_plan_link_fails(self):
-        """If plan-link fails, marker is already gone (test Finding 1).
+    def test_marker_closed_before_plan_link_fails(self):
+        """Marker is closed BEFORE plan-link block, preventing duplicate logs.
 
-        Patch load_plan to return None so the if plan guard prevents
-        the append, or patch save_plan to raise. Either way, verify that
-        a second save_and_close() sees the marker as gone.
+        This test locks in Finding 1: deactivate() happens before save_plan().
+        If plan-link fails after the log is written, the marker is already gone,
+        so a retry does not append a second log block.
+
+        Under the old ordering (deactivate at end), this test fails because:
+        - First save_and_close raises when save_plan fails
+        - But marker is still active (deactivate hasn't run yet)
+        - Second save_and_close appends a second log block
+        - Assertion about single block fails
+
+        Under the fixed ordering (deactivate before plan-link), this test passes:
+        - First save_and_close raises when save_plan fails
+        - But marker is already gone (deactivate ran first)
+        - Second save_and_close returns saved=False
+        - Log file has only one block
         """
         import session_save
 
-        store.save_plan({"topic": "Algebra", "status": "active"})
-        store.activate("s1", "Algebra", "algebra")
+        store.save_plan({"topic": "Grafos", "status": "active"})
+        store.activate("s1", "Grafos", "grafos")
 
-        # First, let's verify a normal call works
-        first = session_save.save_and_close("s1")
-        self.assertTrue(first["saved"])
-
-        # Now activate again and patch save_plan to fail
-        store.activate("s2", "Algebra", "algebra")
         original_save_plan = store.save_plan
+        call_count = [0]
 
         def failing_save_plan(plan):
+            call_count[0] += 1
             raise RuntimeError("simulated plan-link failure")
 
         store.save_plan = failing_save_plan
 
         try:
-            # This will raise because save_plan fails, but the marker
-            # should already be gone by then (deactivate happened first)
+            # First call: save_and_close writes the log and closes the marker,
+            # but then save_plan fails. The marker should already be gone.
+            exception_raised = False
             try:
-                session_save.save_and_close("s2")
-            except RuntimeError:
-                pass  # Expected: plan-link failed
+                session_save.save_and_close("s1")
+            except RuntimeError as e:
+                if "simulated plan-link failure" in str(e):
+                    exception_raised = True
+
+            # Verify the failure path was actually hit
+            self.assertEqual(call_count[0], 1, "save_plan should have been called")
+            self.assertTrue(exception_raised, "Expected exception should have been raised")
+
+            # CRITICAL ASSERTION (discriminates old vs new ordering):
+            # Under fixed ordering: marker is gone (deactivate ran before save_plan)
+            # Under old ordering: marker still exists (deactivate at end never ran)
+            self.assertIsNone(
+                store.active_record("s1"),
+                "Marker must be closed before plan-link block, even if plan-link fails",
+            )
         finally:
             store.save_plan = original_save_plan
 
-        # Now verify that the marker for s2 is actually gone
-        self.assertIsNone(store.active_record("s2"))
-
-        # And a second call to save_and_close would return saved=False
-        second = session_save.save_and_close("s2")
+        # Second call: should return saved=False because marker is gone
+        second = session_save.save_and_close("s1")
         self.assertFalse(second["saved"])
+
+        # CRITICAL ASSERTION (discriminates old vs new ordering):
+        # Under fixed ordering: only one "## " block (second call returned saved=False)
+        # Under old ordering: two "## " blocks (second call appended again)
+        logs = list((store.home() / "sessions").glob("*.md"))
+        self.assertEqual(len(logs), 1)
+        log_text = logs[0].read_text(encoding="utf-8")
+        block_count = log_text.count("\n## ")
+        self.assertEqual(
+            block_count,
+            1,
+            f"Log should have exactly one session block, not {block_count}. "
+            f"If this fails, deactivate() is running after plan-link, not before.",
+        )
 
 
 if __name__ == "__main__":
