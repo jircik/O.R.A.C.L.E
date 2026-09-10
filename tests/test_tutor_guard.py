@@ -82,10 +82,20 @@ class TestActive(GuardTestCase):
         out = run_hook({"session_id": "s1", "prompt": "x"}).stdout
         self.assertLess(len(out), 1800)
 
-    def test_survives_broken_state_directory(self):
-        (store.home() / "concepts.json").write_text("{{{", encoding="utf-8")
+    def test_survives_broken_marker(self):
+        """A corrupt active marker reads as 'not studying' — must be silent."""
+        # Corrupt the .active marker file that the hook actually reads
+        marker_path = store.home() / ".active" / "s1.json"
+        marker_path.write_bytes(b"\x80\x81\x82\x83")  # invalid UTF-8
         result = run_hook({"session_id": "s1", "prompt": "x"})
         self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")  # corrupt marker = not studying
+
+    def test_contract_contains_concepts_set_command_with_continuation(self):
+        """The contract must show the concepts-set command with a trailing backslash."""
+        out = run_hook({"session_id": "s1", "prompt": "x"}).stdout
+        # Check for the exact line with continuation backslash
+        self.assertIn("concepts-set \\\n", out)
 
 
 if __name__ == "__main__":

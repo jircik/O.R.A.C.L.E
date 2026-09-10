@@ -30,7 +30,7 @@ As três guardas:
    (consertar um build, rodar um comando) é atendido normalmente.
 3. Um conceito só vira "known" quando o aluno demonstra, nunca porque você
    explicou bem. Grave com:
-   python3 "$CLAUDE_PLUGIN_ROOT/lib/oracle_store.py" concepts-set \
+   python3 "$CLAUDE_PLUGIN_ROOT/lib/oracle_store.py" concepts-set \\
      --concept C --domain D --level known|shaky|gap --evidence "o que ele fez"
 """
 
