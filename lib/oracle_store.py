@@ -9,7 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 STORAGE_MODES = ("plain", "git", "git-remote")
@@ -315,3 +315,76 @@ def list_plans(status: str = None) -> list:
 def active_plan():
     plans = list_plans(status="active")
     return plans[0] if plans else None
+
+# --- session state -------------------------------------------------------
+
+
+def _active_path(session_id: str) -> Path:
+    # A session id reaches us from a hook payload; never let it walk the tree.
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "-", session_id or "unknown").strip("-") or "unknown"
+    return home() / ".active" / f"{safe}.json"
+
+
+def activate(session_id: str, topic: str = "", plan_slug: str = None) -> dict:
+    record = {
+        "session_id": session_id,
+        "topic": topic,
+        "plan_slug": plan_slug,
+        "started_at": _now(),
+    }
+    path = _active_path(session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return record
+
+
+def active_record(session_id: str):
+    path = _active_path(session_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        # A broken marker means "not studying", never a crash mid-session.
+        return None
+
+
+def deactivate(session_id: str):
+    record = active_record(session_id)
+    path = _active_path(session_id)
+    if path.exists():
+        path.unlink()
+    return record
+
+
+def session_log_rel(topic: str, date: str = None) -> str:
+    return f"sessions/{date or _today()}-{slugify(topic)}.md"
+
+
+def log_session(topic: str, text: str) -> str:
+    rel = session_log_rel(topic)
+    append_text(rel, text)
+    return rel
+
+
+def prune_active(max_age_hours: int = 24) -> int:
+    """Drop markers left behind by sessions that died without SessionEnd."""
+    active_dir = home() / ".active"
+    if not active_dir.is_dir():
+        return 0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    removed = 0
+    for path in active_dir.glob("*.json"):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            started = datetime.fromisoformat(record["started_at"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            stale = started < cutoff
+        except (json.JSONDecodeError, OSError, KeyError, ValueError):
+            stale = True
+        if stale:
+            path.unlink()
+            removed += 1
+    return removed
