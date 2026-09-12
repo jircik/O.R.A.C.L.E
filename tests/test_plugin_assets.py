@@ -77,6 +77,32 @@ class TestSkills(unittest.TestCase):
             self.assertTrue(fields.get("description"))
 
 
+class TestSessionNarrativeLog(unittest.TestCase):
+    """Finding 1: session_save.py only writes a metadata stub (date, topic,
+    'iniciada', 'plano') — the spec's promised readable narrative in
+    sessions/*.md (what was covered, where the student got stuck, the next
+    step) is never written unless a skill or command calls `log --topic`.
+    Lock in that both the tutor skill's closing section and /oracle-off
+    instruct the model to write that narrative before closing."""
+
+    def _flat(self, path: Path) -> str:
+        return re.sub(r"\s+", " ", path.read_text(encoding="utf-8"))
+
+    def test_tutor_skill_instructs_writing_the_narrative_log(self):
+        text = self._flat(ROOT / "skills" / "oracle-tutor" / "SKILL.md")
+        self.assertIn('oracle_store.py" log --topic', text)
+        self.assertIn("coberto", text.lower())
+        self.assertIn("travou", text.lower())
+        self.assertIn("próximo passo", text.lower())
+
+    def test_oracle_off_command_instructs_writing_the_narrative_log(self):
+        text = self._flat(ROOT / "commands" / "oracle-off.md")
+        self.assertIn('oracle_store.py" log --topic', text)
+        self.assertIn("coberto", text.lower())
+        self.assertIn("travou", text.lower())
+        self.assertIn("próximo passo", text.lower())
+
+
 class TestNoInventedSubcommands(unittest.TestCase):
     """Prompts calling a CLI subcommand that does not exist fail silently at
     runtime. Catch it here instead."""

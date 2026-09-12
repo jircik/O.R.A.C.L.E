@@ -108,6 +108,19 @@ class TestGitMode(CommitTestCase):
         self.assertNotIn(("status", "--porcelain"), calls)
 
 
+class TestGitNotInstalled(CommitTestCase):
+    def test_commit_warns_and_does_not_claim_committed_when_git_missing(self):
+        """Finding 11: no test previously covered the git-not-installed
+        branch of commit(). Patch git_available() to report git missing and
+        assert commit() warns without claiming to have committed."""
+        store.init("git")
+        with mock.patch.object(store, "git_available", return_value=False):
+            result = store.commit("estudou grafos")
+        self.assertFalse(result["committed"])
+        self.assertFalse(result["pushed"])
+        self.assertIsNotNone(result["warning"])
+
+
 class TestGitRemoteMode(CommitTestCase):
     def _bare_remote(self):
         remote = Path(self._tmp.name) / "remote.git"

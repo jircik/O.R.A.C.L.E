@@ -77,5 +77,26 @@ cortar do plano futuro exatamente aquilo que ele não sabe.
 
 ## Ao encerrar
 
-O hook `SessionEnd` grava o log sozinho. Se o aluno rodar `/oracle-off`, o
-mesmo caminho roda antes — a rotina é idempotente, então não há log duplicado.
+Antes de fechar — seja por `/oracle-off`, seja porque a sessão está
+terminando — escreva um resumo de três frases do que aconteceu e grave no
+log da sessão:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/lib/oracle_store.py" log --topic "<tópico>" <<'TXT'
+- coberto: <o que foi visto nesta sessão>
+- travou: <onde o aluno travou, ou "não travou">
+- próximo passo: <o que fazer na próxima sessão>
+TXT
+```
+
+Isso é o log legível que o aluno vai reler depois — a metadados brutos
+(data, hora de início, plano vinculado) o hook `SessionEnd` já grava sozinho
+por baixo, como rede de segurança; esse resumo é o que dá substância ao
+arquivo. Continue gravando os conceitos demonstrados com `concepts-set`
+conforme a sessão avança, no momento em que o aluno demonstra — isso não
+muda.
+
+O hook `SessionEnd` grava o log sozinho quando a sessão termina sem
+intervenção (fechou o terminal, por exemplo). Se o aluno rodar `/oracle-off`,
+o mesmo caminho roda antes — a rotina é idempotente, então não há log
+duplicado.

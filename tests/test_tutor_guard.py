@@ -72,10 +72,15 @@ class TestActive(GuardTestCase):
         self.assertIn("Teoria dos Grafos", result.stdout)
 
     def test_contract_states_the_three_guards(self):
+        """Finding 12: `assertIn("resposta", out)` was satisfied by the
+        phrase "nunca a resposta final" in the minimal-next-step bullet,
+        which is NOT the escape hatch — deleting guard 1 entirely from the
+        CONTRACT would still pass that check. Each assertion here targets a
+        phrase unique to its guard within the CONTRACT text."""
         out = run_hook({"session_id": "s1", "prompt": "x"}).stdout
-        self.assertIn("resposta", out)      # escape hatch
-        self.assertIn("demonstr", out)      # known only by demonstration
-        self.assertIn("tópico", out)        # scope limited to the study topic
+        self.assertIn("sem sermão", out)    # guard 1: escape hatch
+        self.assertIn("demonstr", out)      # guard 3: known only by demonstration
+        self.assertIn("tópico", out)        # guard 2: scope limited to the study topic
 
     def test_contract_stays_compact(self):
         """It is injected on every turn; bloat here is paid forever."""

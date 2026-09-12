@@ -27,8 +27,14 @@ class TestSetupSkillContent(unittest.TestCase):
         self.text = re.sub(r'\s+', ' ', raw_text)
 
     def test_explains_all_three_tracks(self):
-        for mode in ("plain", "git", "git-remote"):
-            self.assertIn(mode, self.text)
+        """Finding 13: looping `assertIn(mode, self.text)` over the three
+        mode names is only two real checks, since "git" is a substring of
+        "git-remote" — a skill that never mentions plain `git` on its own
+        would still pass. Match each track's exact `(`mode`)` marker so
+        "git" and "git-remote" are genuinely distinguished."""
+        self.assertIn("(`plain`)", self.text)
+        self.assertIn("(`git`)", self.text)
+        self.assertIn("(`git-remote`)", self.text)
 
     def test_avoids_unexplained_jargon_for_the_plain_track(self):
         self.assertIn("não sabe o que é git", self.text.lower())

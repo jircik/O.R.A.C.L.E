@@ -10,6 +10,23 @@ dúvida rápida continua uma dúvida rápida.
 
 ## Instalação
 
+Este repositório ainda não está publicado no GitHub — instale a partir de uma
+cópia local:
+
+```text
+/plugin marketplace add /caminho/para/oracle
+/plugin install oracle
+/oracle-setup
+```
+
+Para só experimentar, sem instalar de fato:
+
+```bash
+claude --plugin-dir /caminho/para/oracle
+```
+
+Quando o repositório for publicado, a instalação passa a ser:
+
 ```text
 /plugin marketplace add jircik/oracle
 /plugin install oracle

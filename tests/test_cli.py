@@ -140,7 +140,10 @@ class TestPlans(CliTestCase):
 
     def test_invalid_json_on_stdin_exits_nonzero(self):
         result = run("plan-save", stdin="not json")
-        self.assertNotEqual(result.returncode, 0)
+        # Exactly 1 (other error) per the CLI's exit-code contract, not just
+        # "non-zero" — that looser check is what let this kind of bug through.
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("inválido", result.stderr)
 
     def test_list_filters_by_status(self):
         run("plan-save", stdin=json.dumps(self.plan))

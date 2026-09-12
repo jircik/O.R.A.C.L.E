@@ -13,8 +13,7 @@ O plano não começa do zero. Começa da borda do que o aluno já sabe.
 python3 "${CLAUDE_PLUGIN_ROOT}/lib/oracle_store.py" concepts-list
 ```
 
-Se `initialized` estiver ausente ou o comando sair com código 2, pare e mande
-rodar `/oracle-setup`.
+Se o comando sair com código 2, pare e mande rodar `/oracle-setup`.
 
 ## 2. Entenda o alvo
 

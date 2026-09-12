@@ -33,6 +33,18 @@ class TestPlanSkillContent(unittest.TestCase):
     def test_documents_skipped_reason(self):
         self.assertIn("skipped_reason", self.text)
 
+    def test_does_not_branch_on_the_absent_initialized_field(self):
+        """Finding 2: `concepts-list` never emits `initialized` (only
+        `status` does), so a literal-minded model told to stop when
+        `initialized` is absent would abort on every run. The skill must not
+        reference that field at all."""
+        self.assertNotIn("initialized", self.text)
+
+    def test_still_stops_on_exit_code_2(self):
+        """The exit-code-2 branch must remain: concepts-list is in
+        NEEDS_STATE, so it already exits 2 when state is missing."""
+        self.assertIn("código 2", self.text)
+
 
 class TestPlanRoundTrip(unittest.TestCase):
     """The exact JSON shape the skill is told to emit must survive plan-save."""

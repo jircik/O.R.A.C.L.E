@@ -45,7 +45,9 @@ class TestSessionIdDefault(unittest.TestCase):
 
     def test_error_when_neither_flag_nor_env(self):
         result = run("session-activate", "--topic", "Grafos")
-        self.assertNotEqual(result.returncode, 0)
+        # Exactly 1 (other error), not just "non-zero" — 2 means "state not
+        # initialized" and would be the wrong signal here.
+        self.assertEqual(result.returncode, 1)
         self.assertIn("session", result.stderr.lower())
 
 
