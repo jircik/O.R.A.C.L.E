@@ -227,5 +227,57 @@ class TestSaveAndClose(SaveTestCase):
         self.assertIn("mode", result["commit"])
 
 
+class TestOffEntryPoint(SaveTestCase):
+    """Finding 6: nothing in tests/ invoked `hooks/session_save.py --off`
+    directly before this wave, and the flag parsing had a latent IndexError
+    (`argv[argv.index("--session-id") + 1]` when `--session-id` is the last
+    argument) that the outer `except Exception: sys.exit(0)` handler turned
+    into exit 0 with EMPTY stdout — a student running `/oracle-off` would see
+    nothing at all."""
+
+    def _run_off(self, *extra_args, env=None):
+        merged = dict(os.environ)
+        if env:
+            merged.update(env)
+        return subprocess.run(
+            [sys.executable, HOOK, "--off", *extra_args],
+            capture_output=True,
+            text=True,
+            env=merged,
+            check=False,
+        )
+
+    def test_off_with_active_session_saves_and_prints_true(self):
+        store.activate("s1", "Grafos")
+        result = self._run_off("--session-id", "s1")
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["saved"])
+
+    def test_off_with_no_active_session_prints_false(self):
+        result = self._run_off("--session-id", "no-such-session")
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["saved"])
+
+    def test_off_with_trailing_session_id_flag_and_no_value_exits_zero_with_json(self):
+        """`--session-id` as the very last argument, with no value after it,
+        must not IndexError — it must behave as if no session id was passed
+        (falling back to CLAUDE_CODE_SESSION_ID, or to saved: false), and it
+        must print valid JSON, not nothing."""
+        merged = dict(os.environ)
+        merged.pop("CLAUDE_CODE_SESSION_ID", None)
+        result = subprocess.run(
+            [sys.executable, HOOK, "--off", "--session-id"],
+            capture_output=True,
+            text=True,
+            env=merged,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)  # must be valid JSON, not empty stdout
+        self.assertFalse(payload["saved"])
+
+
 if __name__ == "__main__":
     unittest.main()

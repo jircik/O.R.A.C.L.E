@@ -63,7 +63,11 @@ def main() -> int:
     if "--off" in argv:
         session_id = None
         if "--session-id" in argv:
-            session_id = argv[argv.index("--session-id") + 1]
+            idx = argv.index("--session-id") + 1
+            # A trailing `--session-id` with no value must not IndexError —
+            # fall back to CLAUDE_CODE_SESSION_ID (or to "no session") below.
+            if idx < len(argv):
+                session_id = argv[idx]
         session_id = session_id or os.environ.get("CLAUDE_CODE_SESSION_ID")
         if not session_id or not store.is_initialized():
             print(json.dumps({"saved": False, "log": None, "commit": None}))
