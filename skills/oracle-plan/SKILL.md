@@ -69,4 +69,4 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/oracle_store.py" commit --message "oracle: pl
 ## 5. Apresente
 
 Mostre a trilha, e **diga explicitamente o que foi cortado e por quê**. Feche
-dizendo que `/oracle <tópico>` começa a primeira sessão.
+dizendo que `/oracle:oracle <tópico>` começa a primeira sessão.

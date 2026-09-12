@@ -77,7 +77,7 @@ cortar do plano futuro exatamente aquilo que ele não sabe.
 
 ## Ao encerrar
 
-Antes de fechar — seja por `/oracle-off`, seja porque a sessão está
+Antes de fechar — seja por `/oracle:oracle-off`, seja porque a sessão está
 terminando — escreva um resumo de três frases do que aconteceu e grave no
 log da sessão:
 
@@ -97,6 +97,6 @@ conforme a sessão avança, no momento em que o aluno demonstra — isso não
 muda.
 
 O hook `SessionEnd` grava o log sozinho quando a sessão termina sem
-intervenção (fechou o terminal, por exemplo). Se o aluno rodar `/oracle-off`,
-o mesmo caminho roda antes — a rotina é idempotente, então não há log
-duplicado.
+intervenção (fechou o terminal, por exemplo). Se o aluno rodar
+`/oracle:oracle-off`, o mesmo caminho roda antes — a rotina é idempotente,
+então não há log duplicado.

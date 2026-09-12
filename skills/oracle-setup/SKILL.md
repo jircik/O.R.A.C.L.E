@@ -57,4 +57,5 @@ Avise que o repositório precisa ser **privado** — é o histórico de estudo d
 ## 4. Feche
 
 Diga onde ficou o estado (o `home` do `status`), e que os próximos passos são
-`/oracle-plan` para montar um plano ou `/oracle <tópico>` para estudar agora.
+`/oracle:oracle-plan` para montar um plano ou `/oracle:oracle <tópico>` para
+estudar agora.

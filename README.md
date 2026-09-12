@@ -5,8 +5,8 @@
 Um mentor de estudos para o Claude Code. Ele ensina em vez de entregar a
 resposta, e lembra do que você já sabe entre uma sessão e outra.
 
-Só liga quando você pede. Sem `/oracle`, o Claude responde normalmente — uma
-dúvida rápida continua uma dúvida rápida.
+Só liga quando você pede. Sem `/oracle:oracle`, o Claude responde normalmente
+— uma dúvida rápida continua uma dúvida rápida.
 
 ## Instalação
 
@@ -16,7 +16,7 @@ cópia local:
 ```text
 /plugin marketplace add /caminho/para/oracle
 /plugin install oracle
-/oracle-setup
+/oracle:oracle-setup
 ```
 
 Para só experimentar, sem instalar de fato:
@@ -30,21 +30,25 @@ Quando o repositório for publicado, a instalação passa a ser:
 ```text
 /plugin marketplace add jircik/oracle
 /plugin install oracle
-/oracle-setup
+/oracle:oracle-setup
 ```
 
-O `/oracle-setup` pergunta onde guardar seus planos e seu progresso. São três
-opções, e a primeira não exige saber nada de git.
+O `/oracle:oracle-setup` pergunta onde guardar seus planos e seu progresso.
+São três opções, e a primeira não exige saber nada de git.
 
 ## Comandos
 
 | Comando | O que faz |
 |---|---|
-| `/oracle-setup` | Escolhe onde guardar seus dados e cria o estado |
-| `/oracle <tópico>` | Liga o modo tutor e começa a estudar |
-| `/oracle-off` | Encerra a sessão e grava o que aconteceu |
-| `/oracle-plan <tópico>` | Monta uma trilha, pulando o que você já domina |
-| `/oracle-status` | Onde você parou e o que vem a seguir |
+| `/oracle:oracle-setup` | Escolhe onde guardar seus dados e cria o estado |
+| `/oracle:oracle <tópico>` | Liga o modo tutor e começa a estudar |
+| `/oracle:oracle-off` | Encerra a sessão e grava o que aconteceu |
+| `/oracle:oracle-plan <tópico>` | Monta uma trilha, pulando o que você já domina |
+| `/oracle:oracle-status` | Onde você parou e o que vem a seguir |
+
+O Claude Code também aceita uma forma mais curta, sem o prefixo `oracle:`,
+para alguns desses comandos — se você vir `/oracle-status` funcionar sozinho,
+é isso.
 
 ## Como ele ensina
 

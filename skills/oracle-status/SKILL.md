@@ -24,4 +24,5 @@ Apresente, nesta ordem e sem enfeite:
 Se houver mais de um plano `active`, aponte isso: provavelmente um deveria
 estar `paused`. Pergunte antes de mudar qualquer coisa.
 
-Feche sugerindo o próximo passo concreto: `/oracle <tópico do próximo marco>`.
+Feche sugerindo o próximo passo concreto:
+`/oracle:oracle <tópico do próximo marco>`.
