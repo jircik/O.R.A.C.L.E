@@ -28,7 +28,7 @@ claude --plugin-dir /caminho/para/oracle
 Quando o repositório for publicado, a instalação passa a ser:
 
 ```text
-/plugin marketplace add jircik/oracle
+/plugin marketplace add jircik/O.R.A.C.L.E
 /plugin install oracle
 /oracle:oracle-setup
 ```
