@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 import oracle_store as store
@@ -72,6 +73,39 @@ class TestGitMode(CommitTestCase):
         result = store.commit("nada mudou")
         self.assertFalse(result["committed"])
         self.assertIsNone(result["warning"])
+
+    def test_failed_git_add_warns_and_does_not_claim_committed(self):
+        """Finding 7: `git add -A`'s return code was unchecked in commit(),
+        so a failing add fell through to `status --porcelain`, which (with
+        nothing staged) can read as if nothing changed — the student is told
+        committed: false, warning: None, indistinguishable from "nothing to
+        commit" when in fact `git add` blew up.
+
+        This patches store._git so "add" reports failure and asserts (a) the
+        commit is never claimed and a warning is surfaced, and (b) commit()
+        bails out on the failed add instead of still probing `status` and
+        attempting `commit` behind the student's back.
+        """
+        store.init("git")
+        store.write_json("concepts.json", [{"concept": "x"}])
+
+        original_git = store._git
+        calls = []
+
+        def fake_git(*args, **kwargs):
+            calls.append(args)
+            if args and args[0] == "add":
+                return subprocess.CompletedProcess(
+                    ("git", *args), 1, stdout="", stderr="fatal: simulated add failure"
+                )
+            return original_git(*args, **kwargs)
+
+        with mock.patch.object(store, "_git", side_effect=fake_git):
+            result = store.commit("estudou x")
+
+        self.assertFalse(result["committed"])
+        self.assertIsNotNone(result["warning"])
+        self.assertNotIn(("status", "--porcelain"), calls)
 
 
 class TestGitRemoteMode(CommitTestCase):

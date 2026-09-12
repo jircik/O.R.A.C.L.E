@@ -128,21 +128,18 @@ class TestSaveAndClose(SaveTestCase):
     def test_marker_closed_before_plan_link_fails(self):
         """Marker is closed BEFORE plan-link block, preventing duplicate logs.
 
-        This test locks in Finding 1: deactivate() happens before save_plan().
-        If plan-link fails after the log is written, the marker is already gone,
-        so a retry does not append a second log block.
+        This test locks in Finding 1 (earlier review): deactivate() happens
+        before save_plan(). If plan-link fails after the log is written, the
+        marker is already gone, so a retry does not append a second log block.
 
-        Under the old ordering (deactivate at end), this test fails because:
-        - First save_and_close raises when save_plan fails
-        - But marker is still active (deactivate hasn't run yet)
-        - Second save_and_close appends a second log block
-        - Assertion about single block fails
-
-        Under the fixed ordering (deactivate before plan-link), this test passes:
-        - First save_and_close raises when save_plan fails
-        - But marker is already gone (deactivate ran first)
-        - Second save_and_close returns saved=False
-        - Log file has only one block
+        Finding 5 (this wave) changed what happens to the exception itself:
+        the plan-link block is now wrapped in try/except so a plan-link
+        failure no longer propagates out of save_and_close and no longer
+        skips commit() — see test_plan_link_failure_does_not_skip_commit
+        below for that half. This test still locks in the ordering: even
+        though the failure is now swallowed rather than raised, the marker
+        must still be closed before the (failing) plan-link block runs, and
+        a retry must not duplicate the log.
         """
         import session_save
 
@@ -159,18 +156,15 @@ class TestSaveAndClose(SaveTestCase):
         store.save_plan = failing_save_plan
 
         try:
-            # First call: save_and_close writes the log and closes the marker,
-            # but then save_plan fails. The marker should already be gone.
-            exception_raised = False
-            try:
-                session_save.save_and_close("s1")
-            except RuntimeError as e:
-                if "simulated plan-link failure" in str(e):
-                    exception_raised = True
+            # First call: save_and_close writes the log, closes the marker,
+            # and then save_plan fails inside the plan-link block. With the
+            # Finding 5 fix, that failure is caught, so this must NOT raise.
+            result = session_save.save_and_close("s1")
 
-            # Verify the failure path was actually hit
+            # Verify the failure path was actually hit.
             self.assertEqual(call_count[0], 1, "save_plan should have been called")
-            self.assertTrue(exception_raised, "Expected exception should have been raised")
+            # save_and_close still reports success (log was written; commit ran).
+            self.assertTrue(result["saved"])
 
             # CRITICAL ASSERTION (discriminates old vs new ordering):
             # Under fixed ordering: marker is gone (deactivate ran before save_plan)
@@ -199,6 +193,38 @@ class TestSaveAndClose(SaveTestCase):
             f"Log should have exactly one session block, not {block_count}. "
             f"If this fails, deactivate() is running after plan-link, not before.",
         )
+
+    def test_plan_link_failure_does_not_skip_commit(self):
+        """Finding 5: a failure in the plan-link block must not stop commit()
+        from running. Before the fix, the plan-link block was unguarded, so
+        an exception there propagated past `store.commit(...)` — on the
+        SessionEnd path the outer handler in main() swallows it and exits 0,
+        so the session gets logged but never versioned (git/git-remote
+        tracks), with no warning at all.
+
+        This test patches save_plan to raise and asserts save_and_close still
+        returns *a* commit result (i.e. execution reached store.commit(...))
+        instead of letting the exception propagate out of save_and_close.
+        """
+        import session_save
+
+        store.save_plan({"topic": "Grafos", "status": "active"})
+        store.activate("s1", "Grafos", "grafos")
+
+        original_save_plan = store.save_plan
+
+        def failing_save_plan(plan):
+            raise RuntimeError("simulated plan-link failure")
+
+        store.save_plan = failing_save_plan
+        try:
+            result = session_save.save_and_close("s1")
+        finally:
+            store.save_plan = original_save_plan
+
+        self.assertTrue(result["saved"])
+        self.assertIsNotNone(result["commit"])
+        self.assertIn("mode", result["commit"])
 
 
 if __name__ == "__main__":

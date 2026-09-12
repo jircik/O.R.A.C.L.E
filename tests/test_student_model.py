@@ -68,6 +68,26 @@ class TestConcepts(ModelTestCase):
         store.upsert_concept("pilha", "prog", "shaky", "confunde com fila")
         self.assertEqual(store.known_concepts(), ["grafos"])
 
+    def test_known_without_evidence_is_rejected(self):
+        """Finding 3: `known` is enforced only by prose without this check —
+        a level of 'known' with empty (or whitespace-only) evidence must be
+        rejected, or concepts.json becomes optimistic about what the student
+        has actually demonstrated."""
+        with self.assertRaises(ValueError):
+            store.upsert_concept("grafos", "matemática", "known", "")
+        with self.assertRaises(ValueError):
+            store.upsert_concept("grafos", "matemática", "known", "   ")
+
+    def test_known_with_evidence_is_accepted(self):
+        record = store.upsert_concept("grafos", "matemática", "known", "explicou BFS sozinho")
+        self.assertEqual(record["level"], "known")
+
+    def test_shaky_and_gap_allow_empty_evidence(self):
+        shaky = store.upsert_concept("grafos", "matemática", "shaky", "")
+        self.assertEqual(shaky["level"], "shaky")
+        gap = store.upsert_concept("recursão", "prog", "gap", "")
+        self.assertEqual(gap["level"], "gap")
+
 
 class TestPlans(ModelTestCase):
     def _plan(self, topic="Teoria dos Grafos", status="active"):

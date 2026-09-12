@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -128,9 +129,17 @@ def append_text(rel: str, text: str) -> None:
 def _write_atomic(rel: str, content: str) -> None:
     path = _path(rel)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.parent / f".tmp-{path.name}"
-    tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, path)
+    # The temp name must be unique per writer: two processes racing to write
+    # the same file (e.g. two sessions touching concepts.json at once) must
+    # not share a temp path, or one writer's rename can lose the other's
+    # content, read torn data, or hit FileNotFoundError on os.replace.
+    tmp = path.parent / f".tmp-{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}"
+    try:
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def git_available() -> bool:
@@ -181,7 +190,10 @@ def commit(message: str) -> dict:
         return result
 
     _ensure_repo()
-    _git("add", "-A")
+    added = _git("add", "-A")
+    if added.returncode != 0:
+        result["warning"] = f"git add falhou: {added.stderr.strip()}"
+        return result
 
     if not _git("status", "--porcelain").stdout.strip():
         return result
@@ -247,6 +259,12 @@ def upsert_concept(concept: str, domain: str, level: str, evidence: str) -> dict
     """
     if level not in CONCEPT_LEVELS:
         raise ValueError(f"unknown level: {level!r} (expected one of {CONCEPT_LEVELS})")
+
+    if level == "known" and not (evidence or "").strip():
+        raise ValueError(
+            "um conceito só vira \"known\" com evidência do que o aluno demonstrou "
+            "— explique o que ele fez em --evidence."
+        )
 
     concepts = list_concepts()
     target = (concept or "").strip().lower()

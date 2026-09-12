@@ -37,14 +37,21 @@ def save_and_close(session_id: str) -> dict:
     # duplicate the session log (not recoverable without hand-editing).
     store.deactivate(session_id)
 
+    # A failure here (bad plan file, disk issue, ...) must never skip the
+    # commit below: losing the plan cross-reference is cosmetic, but on the
+    # git/git-remote tracks skipping commit() means the session is logged to
+    # disk but never versioned, with no warning to the student.
     plan_slug = record.get("plan_slug")
     if plan_slug:
-        plan = store.load_plan(plan_slug)
-        if plan:
-            log_stem = Path(log_rel).stem
-            if log_stem not in plan.get("sessions", []):
-                plan.setdefault("sessions", []).append(log_stem)
-                store.save_plan(plan)
+        try:
+            plan = store.load_plan(plan_slug)
+            if plan:
+                log_stem = Path(log_rel).stem
+                if log_stem not in plan.get("sessions", []):
+                    plan.setdefault("sessions", []).append(log_stem)
+                    store.save_plan(plan)
+        except Exception as exc:
+            print(f"[oracle] falha ao vincular a sessão ao plano: {exc}", file=sys.stderr)
 
     result = store.commit(f"oracle: sessão de estudo sobre {topic}")
     return {"saved": True, "log": log_rel, "commit": result}
